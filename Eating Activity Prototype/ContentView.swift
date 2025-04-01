@@ -1,24 +1,45 @@
-//
-//  ContentView.swift
-//  Eating Activity Prototype
-//
-//  Created by Chance Castaneda on 3/11/25.
-//
-
+//contentView
+import ActivityKit
 import SwiftUI
 
 struct ContentView: View {
+    @State private var activity: Activity<TimerAttributes>? = nil
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        VStack(spacing: 16) {
+            Button("Start Activity") {
+                startActivity()
+            }
+            Button("Stop Activity") {
+                stopActivity()
+            }
         }
-        .padding()
+        .buttonStyle(.borderedProminent)
+        .controlSize(.large)
+    }
+    
+    func startActivity() {
+        let attributes = TimerAttributes(timerName: "Eating Session")
+        let state = TimerAttributes.TimerStatus(startTime: Date())
+        
+        activity = try? Activity<TimerAttributes>.request(attributes: attributes, contentState: state, pushType: nil)
+    }
+
+    func stopActivity() {
+        Task {
+            await activity?.end(dismissalPolicy: .immediate)
+        }
+    }
+
+    func updateActivity() {
+        let state = TimerAttributes.TimerStatus(startTime: Date())
+        
+        Task {
+            await activity?.update(using: state)
+        }
     }
 }
 
-#Preview {
-    ContentView()
-}
+//#Preview {
+//    ContentView()
+//}
