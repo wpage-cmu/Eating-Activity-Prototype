@@ -8,56 +8,112 @@ struct ContentView: View {
     @StateObject private var audioManager = AudioManager()
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Audio Engine status
-            HStack {
-                Image(systemName: audioManager.isRunning ? "mic.fill" : "mic.slash.fill")
-                    .foregroundColor(audioManager.isRunning ? .green : .red)
-                Text(audioManager.isRunning ? "Microphone Active" : "Microphone Inactive")
-                    .foregroundColor(audioManager.isRunning ? .green : .red)
-            }
-            .font(.headline)
-            .padding()
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color.secondary.opacity(0.1)))
-            
-            // Audio control buttons
-            Button(audioManager.isRunning ? "Stop Microphone" : "Start Microphone") {
-                if audioManager.isRunning {
-                    audioManager.stopAudioEngine()
-                } else {
-                    requestMicrophonePermission { granted in
-                        if granted {
-                            audioManager.startAudioEngine()
-                        } else {
-                            print("Microphone permission denied")
+        VStack(spacing: 24) {
+            // Section 1: Microphone Control
+            VStack(spacing: 12) {
+                Text("Microphone")
+                    .font(.headline)
+                
+                HStack {
+                    Circle()
+                        .fill(audioManager.isRunning ? Color.green : Color.red)
+                        .frame(width: 12, height: 12)
+                    
+                    Text(audioManager.isRunning ? "Active" : "Inactive")
+                        .foregroundColor(audioManager.isRunning ? .green : .red)
+                }
+                
+                Button(audioManager.isRunning ? "Stop Microphone" : "Start Microphone") {
+                    if audioManager.isRunning {
+                        audioManager.stopAudioEngine()
+                    } else {
+                        requestMicrophonePermission { granted in
+                            if granted {
+                                audioManager.startAudioEngine()
+                            } else {
+                                print("Microphone permission denied")
+                            }
                         }
                     }
                 }
+                .buttonStyle(.bordered)
+                .tint(audioManager.isRunning ? .red : .blue)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(audioManager.isRunning ? .red : .blue)
-            .controlSize(.large)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
             
-            Text("Check the debug console to verify audio input")
-                .font(.caption)
-                .foregroundColor(.secondary)
-            
-            Divider()
-            
-            // Original Live Activity controls
-            Button("Start Activity") {
-                startActivity()
+            // Section 2: Sound Classification Results
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sound Classification")
+                    .font(.headline)
+                
+                if !audioManager.detectedSounds.isEmpty {
+                    ForEach(audioManager.detectedSounds.sorted(by: { $0.value > $1.value }).prefix(5), id: \.key) { sound, confidence in
+                        HStack {
+                            Text(formatSoundLabel(sound))
+                                .frame(width: 120, alignment: .leading)
+                            
+                            ProgressView(value: confidence)
+                                .progressViewStyle(.linear)
+                            
+                            Text("\(Int(confidence * 100))%")
+                                .frame(width: 40, alignment: .trailing)
+                                .monospacedDigit()
+                        }
+                    }
+                } else if audioManager.isRunning {
+                    Text("Listening for sounds...")
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Start microphone to detect sounds")
+                        .foregroundColor(.secondary)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
             
-            Button("Stop Activity") {
-                stopActivity()
+            // Section 3: Live Activity Control
+            VStack(spacing: 12) {
+                Text("Live Activity")
+                    .font(.headline)
+                
+                HStack {
+                    Circle()
+                        .fill(activity != nil ? Color.green : Color.gray)
+                        .frame(width: 12, height: 12)
+                    
+                    Text(activity != nil ? "Active" : "Inactive")
+                        .foregroundColor(activity != nil ? .green : .gray)
+                }
+                
+                HStack(spacing: 16) {
+                    Button("Start Activity") {
+                        startActivity()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.blue)
+                    .disabled(activity != nil)
+                    
+                    Button("Stop Activity") {
+                        stopActivity()
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.red)
+                    .disabled(activity == nil)
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
+            .padding()
+            .background(RoundedRectangle(cornerRadius: 12).fill(Color.secondary.opacity(0.1)))
         }
         .padding()
+    }
+    
+    // Helper function to format sound label for display
+    private func formatSoundLabel(_ label: String) -> String {
+        // Convert snake_case to Title Case with spaces
+        let words = label.split(separator: "_")
+        return words.map { $0.prefix(1).uppercased() + $0.dropFirst() }.joined(separator: " ")
     }
     
     func requestMicrophonePermission(completion: @escaping (Bool) -> Void) {
@@ -78,14 +134,6 @@ struct ContentView: View {
     func stopActivity() {
         Task {
             await activity?.end(dismissalPolicy: .immediate)
-        }
-    }
-
-    func updateActivity() {
-        let state = TimerAttributes.TimerStatus(startTime: Date())
-        
-        Task {
-            await activity?.update(using: state)
         }
     }
 }

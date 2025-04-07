@@ -4,8 +4,11 @@
 //
 //  Created by Will Page on 4/7/25.
 //
+// AudioManager.swift
+// AudioManager.swift
 import AVFoundation
 import SwiftUI
+import SoundAnalysis
 
 class AudioManager: NSObject, ObservableObject {
     // Audio engine components
@@ -13,11 +16,42 @@ class AudioManager: NSObject, ObservableObject {
     private var inputBus: AVAudioNodeBus = 0
     private var inputFormat: AVAudioFormat?
     
-    // Published properties to observe in the UI
+    // Sound classification components
+    private var streamAnalyzer: SNAudioStreamAnalyzer?
+    private var classificationRequest: SNClassifySoundRequest?
+    private var resultsObserver: SoundClassifierObserver?
+    private let analysisQueue = DispatchQueue(label: "com.eatingactivity.AnalysisQueue")
+    
+    // Published properties
     @Published var isRunning: Bool = false
+    @Published var detectedSounds: [String: Float] = [:]
     
     override init() {
         super.init()
+        setupSoundClassifier()
+    }
+    
+    private func setupSoundClassifier() {
+        do {
+            // Create the classification request
+            let request = try SNClassifySoundRequest(classifierIdentifier: SNClassifierIdentifier.version1)
+            request.windowDuration = CMTimeMakeWithSeconds(1.5, preferredTimescale: 48000)
+            request.overlapFactor = 0.5
+            
+            // Store the request
+            self.classificationRequest = request
+            
+            // Create the results observer
+            self.resultsObserver = SoundClassifierObserver()
+            self.resultsObserver?.resultsHandler = { [weak self] results in
+                // Update the UI with the latest results
+                DispatchQueue.main.async {
+                    self?.detectedSounds = results
+                }
+            }
+        } catch {
+            print("Error setting up sound classifier: \(error.localizedDescription)")
+        }
     }
     
     func startAudioEngine() {
@@ -33,39 +67,95 @@ class AudioManager: NSObject, ObservableObject {
             try AVAudioSession.sharedInstance().setCategory(.record, mode: .default)
             try AVAudioSession.sharedInstance().setActive(true)
             
-            // Simple verification tap that just logs
-            installSimpleAudioTap()
+            // Create a new stream analyzer with the input format
+            if let format = inputFormat {
+                streamAnalyzer = SNAudioStreamAnalyzer(format: format)
+                
+                // Add the classification request to the analyzer
+                if let request = classificationRequest, let observer = resultsObserver {
+                    try streamAnalyzer?.add(request, withObserver: observer)
+                }
+            }
+            
+            // Install audio tap for processing
+            installAudioTap()
             
             // Start the stream of audio data
             try audioEngine?.start()
             isRunning = true
             
             print("Audio engine started successfully")
-            print("Audio format: \(inputFormat?.description ?? "unknown")")
         } catch {
             print("Unable to start AVAudioEngine: \(error.localizedDescription)")
         }
     }
     
     func stopAudioEngine() {
+        // Remove the classification request from the analyzer
+        if let request = classificationRequest {
+            streamAnalyzer?.remove(request)
+        }
+        
+        // Clean up audio engine
         audioEngine?.inputNode.removeTap(onBus: inputBus)
         audioEngine?.stop()
         try? AVAudioSession.sharedInstance().setActive(false)
-        isRunning = false
         
+        // Reset the analyzer
+        streamAnalyzer = nil
+        
+        isRunning = false
         print("Audio engine stopped")
     }
     
-    private func installSimpleAudioTap() {
-        let bufferSize: UInt32 = 4096
+    private func installAudioTap() {
+        let bufferSize: UInt32 = 8192
         
         audioEngine?.inputNode.installTap(onBus: inputBus,
                                          bufferSize: bufferSize,
                                          format: inputFormat) { [weak self] buffer, time in
-            // Just verify we're receiving data
-            if let pcmBuffer = buffer as? AVAudioPCMBuffer {
-                print("Received audio buffer with \(pcmBuffer.frameLength) frames at time: \(time.sampleTime)")
+            // Process the audio buffer for sound classification
+            self?.analysisQueue.async {
+                self?.streamAnalyzer?.analyze(buffer,
+                                              atAudioFramePosition: AVAudioFramePosition(time.audioTimeStamp.mSampleTime))
             }
         }
+    }
+}
+
+// Observer that receives sound classification results
+class SoundClassifierObserver: NSObject, SNResultsObserving {
+    // Callback to pass results back to the AudioManager
+    var resultsHandler: (([String: Float]) -> Void)?
+    
+    func request(_ request: SNRequest, didProduce result: SNResult) {
+        // Handle sound classification results
+        guard let result = result as? SNClassificationResult else { return }
+        
+        // Process and report the top classifications
+        var classifications: [String: Float] = [:]
+        
+        for classification in result.classifications {
+            // Only include results with reasonable confidence (above 0.1 or 10%)
+            if classification.confidence > 0.1 {
+                classifications[classification.identifier] = Float(classification.confidence)
+            }
+        }
+        
+        // Return the results through the callback
+        resultsHandler?(classifications)
+        
+        // Log the top classification for debugging
+        if let topClassification = result.classifications.first {
+            print("Top sound: \(topClassification.identifier) - \(topClassification.confidence)")
+        }
+    }
+    
+    func request(_ request: SNRequest, didFailWithError error: Error) {
+        print("Sound classification error: \(error.localizedDescription)")
+    }
+    
+    func requestDidComplete(_ request: SNRequest) {
+        print("Sound classification request completed")
     }
 }
