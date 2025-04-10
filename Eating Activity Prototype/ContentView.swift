@@ -3,7 +3,8 @@ import ActivityKit
 import SwiftUI
 
 struct ContentView: View {
-    @State private var activity: Activity<TimerAttributes>? = nil
+    @State       private var activity: Activity<TimerAttributes>? = nil
+    @StateObject private var audioClassifierManager = AudioClassifierManager()
     
     var body: some View {
         VStack(spacing: 16) {
