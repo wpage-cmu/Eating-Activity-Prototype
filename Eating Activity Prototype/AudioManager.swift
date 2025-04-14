@@ -46,17 +46,15 @@ class AudioManager: NSObject, ObservableObject {
             // Create the results observer
             self.resultsObserver = SoundClassifierObserver()
             self.resultsObserver?.resultsHandler = { [weak self] results in
-                // Update the UI with the latest results
                 DispatchQueue.main.async {
                     self?.detectedSounds = results
                 }
             }
             
-            //Try to load Food Prediction Model
+            // Load custom food prediction model (optional)
             do {
                 let config = MLModelConfiguration()
                 self.foodPredictionModel = try FoodPredictionModel_3_d_(configuration: config)
-                // Use `model` for predictions
             } catch {
                 print("Error loading Food Prediction Model: \(error)")
             }
@@ -102,38 +100,36 @@ class AudioManager: NSObject, ObservableObject {
     }
     
     func stopAudioEngine() {
-        // Remove the classification request from the analyzer
         if let request = classificationRequest {
             streamAnalyzer?.remove(request)
         }
         
-        // Clean up audio engine
         audioEngine?.inputNode.removeTap(onBus: inputBus)
         audioEngine?.stop()
         try? AVAudioSession.sharedInstance().setActive(false)
         
-        // Reset the analyzer
         streamAnalyzer = nil
-        
         isRunning = false
         print("Audio engine stopped")
     }
-
+    
     private func installAudioTap() {
         let bufferSize: UInt32 = 8192
         
         audioEngine?.inputNode.installTap(onBus: inputBus,
-                                         bufferSize: bufferSize,
-                                         format: inputFormat) { [weak self] buffer, time in
-            // Process the audio buffer for sound classification
+                                          bufferSize: bufferSize,
+                                          format: inputFormat) { [weak self] buffer, time in
             self?.analysisQueue.async {
                 self?.streamAnalyzer?.analyze(buffer,
                                               atAudioFramePosition: AVAudioFramePosition(time.audioTimeStamp.mSampleTime))
                 
-            // Add a Predictions for the Food Prediction model
-            self.foodPredictionModel?.prediction(audioFiles = buffer,
-                                                 overlapFactor = request.overlapFactor,
-                                                 predictionTimeWindowSize = request.windowDuration)
+                // Optional: Run prediction on buffer using ML model if needed
+                /*
+                if let model = self?.foodPredictionModel {
+                    // Your custom preprocessing & model input logic here
+                    // let prediction = try? model.prediction(input: someAudioFeature)
+                }
+                */
             }
         }
     }
