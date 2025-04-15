@@ -1,7 +1,9 @@
-//contentView
+// ContentView.swift - Updated with combined detection approach
+
 import ActivityKit
 import SwiftUI
 import AVFoundation
+import Combine
 
 struct ContentView: View {
     var body: some View {
@@ -24,22 +26,34 @@ struct ContentView: View {
             .tabItem {
                 Label("Preferences", systemImage: "gear")
             }
+            
+            NavigationView {
+                AnalyticsView()
+                    .navigationTitle("Analytics")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem {
+                Label("Analytics", systemImage: "chart.bar.fill")
+            }
         }
+        .environmentObject(AudioManager())
+        .environmentObject(MetricsManager())
     }
 }
 
-#Preview {
-    ContentView()
-}
-
-//Page Views
-
 struct PrototypingView: View {
+    @EnvironmentObject var audioManager: AudioManager
+    @EnvironmentObject var metricsManager: MetricsManager
+    
     @State private var stepperValue = 0
     @State private var isShowingLogFoodSheet = false
     @State private var isShowingFoodTypeSheet = false
     @State private var selectedFood: String? = nil
-
+    @State private var manualLogMode: Bool = false
+    
+    // Store cancellables
+    @State private var cancellables = Set<AnyCancellable>()
+    
     let foodOptions = [
         "Lettuce",
         "Food Type 2",
@@ -72,6 +86,7 @@ struct PrototypingView: View {
 
                     Button {
                         // Share action
+                        shareAnalytics()
                     } label: {
                         Label("Share Analytics", systemImage: "square.and.arrow.up")
                     }
@@ -81,6 +96,12 @@ struct PrototypingView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Stepper("Eating not detected", value: $stepperValue)
+                        .onChange(of: stepperValue) { oldValue, newValue in
+                            if newValue > oldValue {
+                                // Only track when the value increases
+                                metricsManager.trackManualFoodLog()
+                            }
+                        }
                         .frame(height: 30)
                         .padding()
                         .background(Color.white)
@@ -96,42 +117,57 @@ struct PrototypingView: View {
 
             Spacer()
 
+            // Status indicator when listening
+            if audioManager.isRunning {
+                VStack {
+                    Text("Listening for eating sounds...")
+                        .foregroundColor(.secondary)
+                    
+                    if audioManager.isEating {
+                        Text("Eating detected!")
+                            .font(.headline)
+                            .foregroundColor(.green)
+                            .padding(.top, 5)
+                    }
+                }
+                .padding()
+            }
+
             // Bottom Section
             VStack(spacing: 16) {
                 HStack(spacing: 11) {
                     Button {
-                        // Start Listening
+                        audioManager.startAudioEngine()
+                        setupEatingDetection()
                     } label: {
                         Label("Start Listening", systemImage: "mic.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
+                    .disabled(audioManager.isRunning)
 
                     Button {
-                        // Stop Listening
+                        audioManager.stopAudioEngine()
                     } label: {
                         Text("Stop Listening")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.large)
+                    .disabled(!audioManager.isRunning)
                 }
 
                 Button {
+                    manualLogMode = true
                     isShowingLogFoodSheet = true
+                    
+                    // If not in an eating session, it's a false negative
+                    if !audioManager.isEating {
+                        metricsManager.trackManualFoodLog()
+                    }
                 } label: {
                     Text("Log Food")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .tint(.accentColor)
-
-                Button {
-                    isShowingFoodTypeSheet = true
-                } label: {
-                    Text("Food Type, delete this button later")
                         .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.bordered)
@@ -140,46 +176,68 @@ struct PrototypingView: View {
             }
         }
         .padding()
+        .onAppear {
+            setupEatingDetection()
+        }
 
         // MARK: - Modals
         .sheet(isPresented: $isShowingLogFoodSheet) {
             NavigationStack {
                 VStack(spacing: 0) {
-                            List {
-                                Section(
-                                    header: Text("FOOD LIST"),
-                                    footer: Text("If your food type is not listed, record what you ate in the notes app.")
-                                ) {
-                                    ForEach(foodOptions, id: \.self) { option in
-                                        HStack {
-                                            Text(option)
-                                            Spacer()
-                                            if option == selectedFood {
-                                                Image(systemName: "checkmark")
-                                                    .foregroundColor(.accentColor)
-                                            }
-                                        }
-                                        .contentShape(Rectangle())
-                                        .onTapGesture {
-                                            selectedFood = option
-                                        }
+                    List {
+                        Section(
+                            header: Text("FOOD LIST"),
+                            footer: Text("If your food type is not listed, record what you ate in the notes app.")
+                        ) {
+                            ForEach(foodOptions, id: \.self) { option in
+                                HStack {
+                                    Text(option)
+                                    Spacer()
+                                    if option == selectedFood {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.accentColor)
                                     }
                                 }
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedFood = option
+                                }
                             }
-                            .listStyle(.insetGrouped)
-
-                            // Large Done button at bottom
-                            Button {
-                                isShowingLogFoodSheet = false
-                            } label: {
-                                Text("Done")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
-                            .frame(maxWidth: .infinity)
-                            .padding()
                         }
+                    }
+                    .listStyle(.insetGrouped)
+
+                    // Large Done button at bottom
+                    Button {
+                        isShowingLogFoodSheet = false
+                        
+                        // Log food selection and end activity if not manual mode
+                        if !manualLogMode {
+                            // This was triggered by eating detection - track as true positive
+                            metricsManager.trackNotificationResponse(
+                                userLoggedFood: true,
+                                predictedFoodCorrect: false,  // We don't know if prediction was correct
+                                selectedFood: selectedFood
+                            )
+                            
+                            // End the activity
+                            audioManager.endEatingActivity()
+                        }
+                        
+                        // Reset manual mode flag
+                        manualLogMode = false
+                        
+                        // Reset selected food
+                        selectedFood = nil
+                    } label: {
+                        Text("Done")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
                 .background(Color(.systemGroupedBackground))
                 .navigationTitle("Log Food")
                 .navigationBarTitleDisplayMode(.inline)
@@ -187,50 +245,78 @@ struct PrototypingView: View {
                     ToolbarItem(placement: .navigationBarTrailing) {
                         Button("Cancel") {
                             isShowingLogFoodSheet = false
+                            
+                            // If canceled and not manual, log as false positive
+                            if !manualLogMode {
+                                metricsManager.trackNotificationResponse(
+                                    userLoggedFood: false,
+                                    predictedFoodCorrect: nil,
+                                    selectedFood: nil
+                                )
+                                
+                                // End the activity
+                                audioManager.endEatingActivity()
+                            }
+                            
+                            // Reset manual mode flag
+                            manualLogMode = false
+                            
+                            // Reset selected food
+                            selectedFood = nil
                         }
                     }
                 }
             }
         }
 
-
         .sheet(isPresented: $isShowingFoodTypeSheet) {
             NavigationStack {
                 VStack {
                     VStack(spacing: 16) {
-                        Text("Sounds like you’re eating...")
+                        Text("Sounds like you're eating...")
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(.secondary)
-                        Text("Lettuce")
+                        Text(audioManager.predictedFoodType ?? "Food")
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .padding(.bottom, 100)
                     }
-                    .frame(width: .infinity, height: 500)
+                    .frame(maxWidth: .infinity, maxHeight: 500)
                     
                     HStack(spacing: 11) {
                         Button {
-                            isShowingLogFoodSheet = true
+                            // Food prediction was wrong
                             isShowingFoodTypeSheet = false
+                            isShowingLogFoodSheet = true
+                            
+                            // No need to track here, will track when food is logged
                         } label: {
                             Text("No")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
                         .controlSize(.large)
-                        .tint(.accentColor)
                         
                         Button {
-                            isShowingLogFoodSheet = true
+                            // Food prediction was correct
                             isShowingFoodTypeSheet = false
+                            
+                            // Log as true positive with correct prediction
+                            metricsManager.trackNotificationResponse(
+                                userLoggedFood: true,
+                                predictedFoodCorrect: true,
+                                selectedFood: audioManager.predictedFoodType
+                            )
+                            
+                            // End the activity
+                            audioManager.endEatingActivity()
                         } label: {
                             Text("Yes")
                                 .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.bordered)
+                        .buttonStyle(.borderedProminent)
                         .controlSize(.large)
-                        .tint(.accentColor)
                     }
                 }
                 .padding()
@@ -240,15 +326,70 @@ struct PrototypingView: View {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
                             isShowingFoodTypeSheet = false
+                            
+                            // Log as false positive
+                            metricsManager.trackNotificationResponse(
+                                userLoggedFood: false,
+                                predictedFoodCorrect: nil,
+                                selectedFood: nil
+                            )
+                            
+                            // End the activity
+                            audioManager.endEatingActivity()
                         }
                     }
                 }
             }
         }
     }
+    
+    private func setupEatingDetection() {
+        // Subscribe to eating state changes
+        audioManager.$isEating
+            .dropFirst() // Skip the initial value
+            .sink { isEating in
+                if isEating {
+                    // New eating session detected
+                    self.metricsManager.trackNotificationSent()
+                    
+                    if self.audioManager.predictedFoodType != nil {
+                        // If we have a predicted food type, show that sheet
+                        self.isShowingFoodTypeSheet = true
+                    } else {
+                        // Otherwise show the general food logging sheet
+                        self.isShowingLogFoodSheet = true
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func shareAnalytics() {
+        let csv = metricsManager.exportMetricsCSV()
+        
+        // Create a temporary file URL
+        let tempDirectoryURL = FileManager.default.temporaryDirectory
+        let fileURL = tempDirectoryURL.appendingPathComponent("eating_metrics.csv")
+        
+        // Write CSV to file
+        do {
+            try csv.write(to: fileURL, atomically: true, encoding: .utf8)
+            
+            // Show share sheet
+            let activityVC = UIActivityViewController(activityItems: [fileURL], applicationActivities: nil)
+            
+            // Find the UIWindow to present from
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first {
+                window.rootViewController?.present(activityVC, animated: true)
+            }
+        } catch {
+            print("Error exporting metrics: \(error)")
+        }
+    }
 }
 
-
+// Update PreferencesView to connect with MetricsManager
 struct PreferencesView: View {
     enum LiveActivityDesign: String, CaseIterable, Identifiable {
         case simple = "Simple"
@@ -262,8 +403,10 @@ struct PreferencesView: View {
         var id: String { self.rawValue }
     }
 
+    @EnvironmentObject var metricsManager: MetricsManager
     @State private var selectedDesign: LiveActivityDesign = .simple
     @State private var selectedModel: DetectionModel = .native
+    @AppStorage("eatingSessionCooldown") private var eatingSessionCooldown: Double = 900 // Default 15 min
 
     var body: some View {
         List {

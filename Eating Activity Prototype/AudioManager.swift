@@ -4,12 +4,12 @@
 //
 //  Created by Will Page on 4/7/25.
 //
-// AudioManager.swift
-// AudioManager.swift
+// AudioManager.swift - Updated implementation with debouncing
 import AVFoundation
 import SwiftUI
 import SoundAnalysis
 import CoreML
+import ActivityKit
 
 class AudioManager: NSObject, ObservableObject {
     // Audio engine components
@@ -27,6 +27,20 @@ class AudioManager: NSObject, ObservableObject {
     // Published properties
     @Published var isRunning: Bool = false
     @Published var detectedSounds: [String: Float] = [:]
+    @Published var isEating: Bool = false
+    @Published var eatingConfidence: Float = 0.0
+    @Published var predictedFoodType: String? = nil
+    
+    // Live Activity properties
+    @Published var currentActivity: Activity<TimerAttributes>? = nil
+    
+    // Debouncing properties
+    private var eatingSessionCooldown: TimeInterval = 900 // 15 minutes
+    private var lastEatingDetection: Date? = nil
+    
+    // Eating detection configuration
+    private let eatingThreshold: Float = 0.6
+    private let eatingKeywords = ["chewing", "bite", "eating", "crunching"]
     
     override init() {
         super.init()
@@ -48,6 +62,7 @@ class AudioManager: NSObject, ObservableObject {
             self.resultsObserver?.resultsHandler = { [weak self] results in
                 DispatchQueue.main.async {
                     self?.detectedSounds = results
+                    self?.checkForEatingActivity(in: results)
                 }
             }
             
@@ -61,6 +76,81 @@ class AudioManager: NSObject, ObservableObject {
         } catch {
             print("Error setting up sound classifier: \(error.localizedDescription)")
         }
+    }
+    
+    private func checkForEatingActivity(in classifications: [String: Float]) {
+        // Check if we already have an active Live Activity
+        if currentActivity != nil {
+            return
+        }
+        
+        // Check cooldown period
+        if let lastDetection = lastEatingDetection {
+            let timeSinceLastDetection = Date().timeIntervalSince(lastDetection)
+            if timeSinceLastDetection < eatingSessionCooldown {
+                return
+            }
+        }
+        
+        // Analyze detected sounds for eating patterns
+        let totalEatingConfidence = eatingKeywords.reduce(0) { sum, keyword in
+            sum + (classifications.filter { $0.key.localizedCaseInsensitiveContains(keyword) }
+                        .values.max() ?? 0)
+        }
+        
+        // Normalize confidence value
+        eatingConfidence = min(totalEatingConfidence, 1.0)
+        
+        // Update eating state
+        let wasEating = isEating
+        isEating = eatingConfidence > eatingThreshold
+        
+        // Try to detect the most likely food type
+        if isEating, let topSound = classifications.max(by: { $0.value < $1.value }) {
+            predictedFoodType = topSound.key
+        }
+        
+        // Trigger Live Activity if state changes to eating
+        if !wasEating && isEating {
+            lastEatingDetection = Date()
+            startEatingActivity()
+        }
+    }
+    
+    private func startEatingActivity() {
+        // Check if Live Activities are supported
+        guard ActivityAuthorizationInfo().areActivitiesEnabled else {
+            print("Live Activities not supported")
+            return
+        }
+        
+        // Create Live Activity
+        let attributes = TimerAttributes(timerName: "Eating Timer")
+        let contentState = TimerAttributes.ContentState(startTime: Date())
+        
+        do {
+            let activity = try Activity.request(
+                attributes: attributes,
+                contentState: contentState,
+                pushType: nil
+            )
+            currentActivity = activity
+            print("Started Live Activity with ID: \(activity.id)")
+        } catch {
+            print("Error starting Live Activity: \(error)")
+        }
+    }
+    
+    func endEatingActivity() {
+        Task {
+            // Use the .end to complete the activity
+            await currentActivity?.end(nil, dismissalPolicy: .immediate)
+            currentActivity = nil
+        }
+    }
+    
+    func resetEatingSessionCooldown() {
+        lastEatingDetection = nil
     }
     
     func startAudioEngine() {
@@ -110,6 +200,10 @@ class AudioManager: NSObject, ObservableObject {
         
         streamAnalyzer = nil
         isRunning = false
+        
+        // Also end any active eating session
+        endEatingActivity()
+        
         print("Audio engine stopped")
     }
     
@@ -122,14 +216,6 @@ class AudioManager: NSObject, ObservableObject {
             self?.analysisQueue.async {
                 self?.streamAnalyzer?.analyze(buffer,
                                               atAudioFramePosition: AVAudioFramePosition(time.audioTimeStamp.mSampleTime))
-                
-                // Optional: Run prediction on buffer using ML model if needed
-                /*
-                if let model = self?.foodPredictionModel {
-                    // Your custom preprocessing & model input logic here
-                    // let prediction = try? model.prediction(input: someAudioFeature)
-                }
-                */
             }
         }
     }
