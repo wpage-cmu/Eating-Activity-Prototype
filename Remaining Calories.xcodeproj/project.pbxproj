@@ -551,8 +551,10 @@
 				DEVELOPMENT_TEAM = 347834QV62;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Eating-Activity-Prototype-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Calories Proto";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = UIBackgroundModes;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to detect when you're eating.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -584,8 +586,10 @@
 				DEVELOPMENT_TEAM = 347834QV62;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Eating-Activity-Prototype-Info.plist";
 				INFOPLIST_KEY_CFBundleDisplayName = "Calories Proto";
 				INFOPLIST_KEY_LSApplicationCategoryType = "";
+				INFOPLIST_KEY_NSHumanReadableCopyright = UIBackgroundModes;
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to detect when you're eating.";
 				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

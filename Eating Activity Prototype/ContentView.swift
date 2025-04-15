@@ -87,23 +87,7 @@ struct DebugView: View {
                 }
             }
             
-            Section(header: Text("DETECTED SOUNDS")) {
-                if audioManager.detectedSounds.isEmpty {
-                    Text("No sounds detected yet")
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(Array(audioManager.detectedSounds.keys.sorted()), id: \.self) { sound in
-                        if let confidence = audioManager.detectedSounds[sound] {
-                            HStack {
-                                Text(sound)
-                                Spacer()
-                                Text(String(format: "%.1f%%", confidence * 100))
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                    }
-                }
-            }
+
             
             Section(header: Text("TEST CONTROLS")) {
                 Button("Force Trigger Notification") {
@@ -123,6 +107,24 @@ struct DebugView: View {
                     audioManager.endEatingActivity()
                 }
                 .foregroundColor(.red)
+            }
+            
+            Section(header: Text("DETECTED SOUNDS")) {
+                if audioManager.detectedSounds.isEmpty {
+                    Text("No sounds detected yet")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(Array(audioManager.detectedSounds.keys.sorted()), id: \.self) { sound in
+                        if let confidence = audioManager.detectedSounds[sound] {
+                            HStack {
+                                Text(sound)
+                                Spacer()
+                                Text(String(format: "%.1f%%", confidence * 100))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
             }
         }
         .listStyle(.insetGrouped)

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleGetInfoString</key>
+	<string>NSBackgroundModeDescription</string>
+	<key>NSBackgroundModeDescription</key>
+	<string>This app uses background audio to detect when you're eating, even when the app is closed.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string></string>
+		<string>Audio</string>
+	</array>
+</dict>
+</plist>

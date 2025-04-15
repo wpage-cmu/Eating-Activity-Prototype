@@ -43,10 +43,50 @@ class AudioManager: NSObject, ObservableObject {
     private let eatingThreshold: Float = 0.2 // LOWERED FROM 0.6
     private let eatingKeywords = ["chewing", "bite", "eating", "crunching", "munching", "food"]
     
+    // In AudioManager.swift - add to init()
     override init() {
         super.init()
         print("AudioManager initialized")
         setupSoundClassifier()
+        
+        // Register for audio session notifications
+        NotificationCenter.default.addObserver(self,
+                                               selector: #selector(handleAudioSessionInterruption),
+                                               name: AVAudioSession.interruptionNotification,
+                                               object: nil)
+    }
+
+    @objc private func handleAudioSessionInterruption(notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            // Interruption began, audio has stopped
+            print("Audio session interrupted - recording paused")
+            
+        case .ended:
+            // Interruption ended, resume if needed
+            guard let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+            
+            if options.contains(.shouldResume) {
+                // Resume audio session
+                print("Audio session interruption ended - resuming")
+                do {
+                    try audioEngine?.start()
+                    isRunning = true
+                } catch {
+                    print("Error resuming audio engine: \(error)")
+                }
+            }
+            
+        @unknown default:
+            break
+        }
     }
     
     private func setupSoundClassifier() {
@@ -161,10 +201,17 @@ class AudioManager: NSObject, ObservableObject {
             let activity = try Activity.request(
                 attributes: attributes,
                 contentState: contentState,
-                pushType: nil
+                pushType: .token // Request push token for background updates
             )
             currentActivity = activity
             print("SUCCESS: Started Live Activity with ID: \(activity.id)")
+            
+            if let token = activity.pushToken {
+                // You could store this token to send push updates
+                // This allows updating the Live Activity via push notifications
+                let tokenString = token.map { String(format: "%02x", $0) }.joined()
+                print("Push token: \(tokenString)")
+            }
         } catch {
             print("ERROR: Failed to start Live Activity: \(error)")
         }
@@ -184,6 +231,7 @@ class AudioManager: NSObject, ObservableObject {
         print("Eating session cooldown reset")
     }
     
+    // In AudioManager.swift
     func startAudioEngine() {
         print("Starting audio engine...")
         
@@ -195,9 +243,12 @@ class AudioManager: NSObject, ObservableObject {
         inputFormat = audioEngine?.inputNode.inputFormat(forBus: inputBus)
         
         do {
-            // Configure audio session for recording
-            try AVAudioSession.sharedInstance().setCategory(.record, mode: .default)
-            try AVAudioSession.sharedInstance().setActive(true)
+            // Configure audio session for recording with background capability
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord,
+                                        mode: .default,
+                                        options: [.mixWithOthers, .allowBluetooth])
+            try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
             
             // Create a new stream analyzer with the input format
             if let format = inputFormat {
