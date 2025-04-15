@@ -88,6 +88,13 @@
 			);
 			target = 7C8C16DE2D8088A3006BFA0D /* Live ActivityExtension */;
 		};
+		EF7911E72DADF01F00A7906B /* Exceptions for "Eating Activity PrototypeUITests" folder in "Eating Activity PrototypeUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				"Eating-Activity-PrototypeUITests-Info.plist",
+			);
+			target = 7C8C16C72D8084DC006BFA0D /* Eating Activity PrototypeUITests */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -108,6 +115,9 @@
 		};
 		7C8C16CB2D8084DC006BFA0D /* Eating Activity PrototypeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EF7911E72DADF01F00A7906B /* Exceptions for "Eating Activity PrototypeUITests" folder in "Eating Activity PrototypeUITests" target */,
+			);
 			path = "Eating Activity PrototypeUITests";
 			sourceTree = "<group>";
 		};
@@ -641,6 +651,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 347834QV62;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Eating-Activity-PrototypeUITests-Info.plist";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "dsedtfrygtu.Eating-Activity-PrototypeUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -658,6 +670,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 347834QV62;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Eating-Activity-PrototypeUITests-Info.plist";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "dsedtfrygtu.Eating-Activity-PrototypeUITests";
 				PRODUCT_NAME = "$(TARGET_NAME)";

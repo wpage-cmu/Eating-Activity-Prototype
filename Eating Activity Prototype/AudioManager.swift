@@ -4,7 +4,8 @@
 //
 //  Created by Will Page on 4/7/25.
 //
-// AudioManager.swift - Updated implementation with debouncing
+// AudioManager.swift - Updated implementation with debugging
+
 import AVFoundation
 import SwiftUI
 import SoundAnalysis
@@ -21,7 +22,7 @@ class AudioManager: NSObject, ObservableObject {
     private var streamAnalyzer: SNAudioStreamAnalyzer?
     private var classificationRequest: SNClassifySoundRequest?
     private var resultsObserver: SoundClassifierObserver?
-    private var foodPredictionModel: FoodPredictionModel_3_d_?
+    private var foodPredictionModel: MLModel? // Changed to generic MLModel
     private let analysisQueue = DispatchQueue(label: "com.eatingactivity.AnalysisQueue")
     
     // Published properties
@@ -35,15 +36,16 @@ class AudioManager: NSObject, ObservableObject {
     @Published var currentActivity: Activity<TimerAttributes>? = nil
     
     // Debouncing properties
-    private var eatingSessionCooldown: TimeInterval = 900 // 15 minutes
+    private var eatingSessionCooldown: TimeInterval = 30 // REDUCED TO 30 SECONDS FOR TESTING
     private var lastEatingDetection: Date? = nil
     
-    // Eating detection configuration
-    private let eatingThreshold: Float = 0.6
-    private let eatingKeywords = ["chewing", "bite", "eating", "crunching"]
+    // Eating detection configuration - REDUCED THRESHOLD FOR TESTING
+    private let eatingThreshold: Float = 0.2 // LOWERED FROM 0.6
+    private let eatingKeywords = ["chewing", "bite", "eating", "crunching", "munching", "food"]
     
     override init() {
         super.init()
+        print("AudioManager initialized")
         setupSoundClassifier()
     }
     
@@ -67,20 +69,28 @@ class AudioManager: NSObject, ObservableObject {
             }
             
             // Load custom food prediction model (optional)
+            // Note: Commenting out specific model reference that might cause crashes
+            /*
             do {
                 let config = MLModelConfiguration()
                 self.foodPredictionModel = try FoodPredictionModel_3_d_(configuration: config)
             } catch {
                 print("Error loading Food Prediction Model: \(error)")
             }
+            */
+            
+            print("Sound classifier setup completed successfully")
         } catch {
-            print("Error setting up sound classifier: \(error.localizedDescription)")
+            print("ERROR setting up sound classifier: \(error.localizedDescription)")
         }
     }
     
     private func checkForEatingActivity(in classifications: [String: Float]) {
+        print("Detected sounds: \(classifications)")
+        
         // Check if we already have an active Live Activity
         if currentActivity != nil {
+            print("Live Activity already active - ignoring new detection")
             return
         }
         
@@ -88,18 +98,35 @@ class AudioManager: NSObject, ObservableObject {
         if let lastDetection = lastEatingDetection {
             let timeSinceLastDetection = Date().timeIntervalSince(lastDetection)
             if timeSinceLastDetection < eatingSessionCooldown {
+                print("In cooldown period - \(eatingSessionCooldown - timeSinceLastDetection) seconds remaining")
                 return
             }
         }
         
         // Analyze detected sounds for eating patterns
-        let totalEatingConfidence = eatingKeywords.reduce(0) { sum, keyword in
-            sum + (classifications.filter { $0.key.localizedCaseInsensitiveContains(keyword) }
-                        .values.max() ?? 0)
+        var totalEatingConfidence: Float = 0.0
+        var matchedKeywords: [String] = []
+        
+        for keyword in eatingKeywords {
+            let matchingClassifications = classifications.filter {
+                $0.key.localizedCaseInsensitiveContains(keyword)
+            }
+            
+            if let highestConfidence = matchingClassifications.values.max() {
+                totalEatingConfidence += highestConfidence
+                matchedKeywords.append(keyword)
+            }
+        }
+        
+        // Debug output
+        if !matchedKeywords.isEmpty {
+            print("MATCHED KEYWORDS: \(matchedKeywords)")
+            print("Total eating confidence: \(totalEatingConfidence)")
         }
         
         // Normalize confidence value
         eatingConfidence = min(totalEatingConfidence, 1.0)
+        print("Eating confidence: \(eatingConfidence)")
         
         // Update eating state
         let wasEating = isEating
@@ -108,10 +135,12 @@ class AudioManager: NSObject, ObservableObject {
         // Try to detect the most likely food type
         if isEating, let topSound = classifications.max(by: { $0.value < $1.value }) {
             predictedFoodType = topSound.key
+            print("Predicted food type: \(topSound.key)")
         }
         
         // Trigger Live Activity if state changes to eating
         if !wasEating && isEating {
+            print("EATING DETECTED! Starting Live Activity...")
             lastEatingDetection = Date()
             startEatingActivity()
         }
@@ -120,7 +149,7 @@ class AudioManager: NSObject, ObservableObject {
     private func startEatingActivity() {
         // Check if Live Activities are supported
         guard ActivityAuthorizationInfo().areActivitiesEnabled else {
-            print("Live Activities not supported")
+            print("ERROR: Live Activities not supported")
             return
         }
         
@@ -135,9 +164,9 @@ class AudioManager: NSObject, ObservableObject {
                 pushType: nil
             )
             currentActivity = activity
-            print("Started Live Activity with ID: \(activity.id)")
+            print("SUCCESS: Started Live Activity with ID: \(activity.id)")
         } catch {
-            print("Error starting Live Activity: \(error)")
+            print("ERROR: Failed to start Live Activity: \(error)")
         }
     }
     
@@ -146,14 +175,18 @@ class AudioManager: NSObject, ObservableObject {
             // Use the .end to complete the activity
             await currentActivity?.end(nil, dismissalPolicy: .immediate)
             currentActivity = nil
+            print("Live Activity ended")
         }
     }
     
     func resetEatingSessionCooldown() {
         lastEatingDetection = nil
+        print("Eating session cooldown reset")
     }
     
     func startAudioEngine() {
+        print("Starting audio engine...")
+        
         // Create a new audio engine
         audioEngine = AVAudioEngine()
         
@@ -173,6 +206,7 @@ class AudioManager: NSObject, ObservableObject {
                 // Add the classification request to the analyzer
                 if let request = classificationRequest, let observer = resultsObserver {
                     try streamAnalyzer?.add(request, withObserver: observer)
+                    print("Added classification request to stream analyzer")
                 }
             }
             
@@ -183,13 +217,15 @@ class AudioManager: NSObject, ObservableObject {
             try audioEngine?.start()
             isRunning = true
             
-            print("Audio engine started successfully")
+            print("SUCCESS: Audio engine started successfully")
         } catch {
-            print("Unable to start AVAudioEngine: \(error.localizedDescription)")
+            print("ERROR: Unable to start AVAudioEngine: \(error.localizedDescription)")
         }
     }
     
     func stopAudioEngine() {
+        print("Stopping audio engine...")
+        
         if let request = classificationRequest {
             streamAnalyzer?.remove(request)
         }
@@ -218,6 +254,8 @@ class AudioManager: NSObject, ObservableObject {
                                               atAudioFramePosition: AVAudioFramePosition(time.audioTimeStamp.mSampleTime))
             }
         }
+        
+        print("Audio tap installed")
     }
 }
 
@@ -234,8 +272,8 @@ class SoundClassifierObserver: NSObject, SNResultsObserving {
         var classifications: [String: Float] = [:]
         
         for classification in result.classifications {
-            // Only include results with reasonable confidence (above 0.1 or 10%)
-            if classification.confidence > 0.1 {
+            // Lower threshold to 0.05 (5%) to catch more sounds
+            if classification.confidence > 0.05 {
                 classifications[classification.identifier] = Float(classification.confidence)
             }
         }
@@ -250,7 +288,7 @@ class SoundClassifierObserver: NSObject, SNResultsObserving {
     }
     
     func request(_ request: SNRequest, didFailWithError error: Error) {
-        print("Sound classification error: \(error.localizedDescription)")
+        print("ERROR: Sound classification error: \(error.localizedDescription)")
     }
     
     func requestDidComplete(_ request: SNRequest) {

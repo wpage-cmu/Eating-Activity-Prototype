@@ -1,4 +1,4 @@
-// ContentView.swift - Updated with combined detection approach
+// ContentView.swift - Updated with debugging UI
 
 import ActivityKit
 import SwiftUI
@@ -35,9 +35,97 @@ struct ContentView: View {
             .tabItem {
                 Label("Analytics", systemImage: "chart.bar.fill")
             }
+            
+            // Add Debug Tab
+            NavigationView {
+                DebugView()
+                    .navigationTitle("Debug")
+                    .navigationBarTitleDisplayMode(.large)
+            }
+            .tabItem {
+                Label("Debug", systemImage: "hammer")
+            }
         }
         .environmentObject(AudioManager())
         .environmentObject(MetricsManager())
+    }
+}
+
+// New Debug View for testing
+struct DebugView: View {
+    @EnvironmentObject var audioManager: AudioManager
+    
+    var body: some View {
+        List {
+            Section(header: Text("AUDIO STATUS")) {
+                HStack {
+                    Text("Recording Active")
+                    Spacer()
+                    Text(audioManager.isRunning ? "Yes" : "No")
+                        .foregroundColor(audioManager.isRunning ? .green : .red)
+                }
+                
+                HStack {
+                    Text("Eating Detected")
+                    Spacer()
+                    Text(audioManager.isEating ? "Yes" : "No")
+                        .foregroundColor(audioManager.isEating ? .green : .red)
+                }
+                
+                HStack {
+                    Text("Confidence Level")
+                    Spacer()
+                    Text(String(format: "%.1f%%", audioManager.eatingConfidence * 100))
+                }
+                
+                if let foodType = audioManager.predictedFoodType {
+                    HStack {
+                        Text("Predicted Food")
+                        Spacer()
+                        Text(foodType)
+                    }
+                }
+            }
+            
+            Section(header: Text("DETECTED SOUNDS")) {
+                if audioManager.detectedSounds.isEmpty {
+                    Text("No sounds detected yet")
+                        .foregroundColor(.secondary)
+                } else {
+                    ForEach(Array(audioManager.detectedSounds.keys.sorted()), id: \.self) { sound in
+                        if let confidence = audioManager.detectedSounds[sound] {
+                            HStack {
+                                Text(sound)
+                                Spacer()
+                                Text(String(format: "%.1f%%", confidence * 100))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Section(header: Text("TEST CONTROLS")) {
+                Button("Force Trigger Notification") {
+                    // Force trigger eating notification for testing
+                    withAnimation {
+                        audioManager.isEating = true
+                    }
+                }
+                .foregroundColor(.blue)
+                
+                Button("Reset Cooldown") {
+                    audioManager.resetEatingSessionCooldown()
+                }
+                .foregroundColor(.blue)
+                
+                Button("End Current Activity") {
+                    audioManager.endEatingActivity()
+                }
+                .foregroundColor(.red)
+            }
+        }
+        .listStyle(.insetGrouped)
     }
 }
 
@@ -50,6 +138,7 @@ struct PrototypingView: View {
     @State private var isShowingFoodTypeSheet = false
     @State private var selectedFood: String? = nil
     @State private var manualLogMode: Bool = false
+    @State private var debugText: String = "No events yet"
     
     // Store cancellables
     @State private var cancellables = Set<AnyCancellable>()
@@ -117,6 +206,16 @@ struct PrototypingView: View {
 
             Spacer()
 
+            // Debug text area
+            Text(debugText)
+                .font(.footnote)
+                .foregroundColor(.secondary)
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemGray6))
+                .cornerRadius(8)
+                .padding(.horizontal)
+
             // Status indicator when listening
             if audioManager.isRunning {
                 VStack {
@@ -129,6 +228,11 @@ struct PrototypingView: View {
                             .foregroundColor(.green)
                             .padding(.top, 5)
                     }
+                    
+                    // Show confidence level
+                    Text("Confidence: \(String(format: "%.1f%%", audioManager.eatingConfidence * 100))")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
                 }
                 .padding()
             }
@@ -139,6 +243,7 @@ struct PrototypingView: View {
                     Button {
                         audioManager.startAudioEngine()
                         setupEatingDetection()
+                        debugText = "Started listening at \(formattedTime())"
                     } label: {
                         Label("Start Listening", systemImage: "mic.fill")
                             .frame(maxWidth: .infinity)
@@ -149,6 +254,7 @@ struct PrototypingView: View {
 
                     Button {
                         audioManager.stopAudioEngine()
+                        debugText = "Stopped listening at \(formattedTime())"
                     } label: {
                         Text("Stop Listening")
                             .frame(maxWidth: .infinity)
@@ -161,6 +267,7 @@ struct PrototypingView: View {
                 Button {
                     manualLogMode = true
                     isShowingLogFoodSheet = true
+                    debugText = "Manual food log at \(formattedTime())"
                     
                     // If not in an eating session, it's a false negative
                     if !audioManager.isEating {
@@ -178,6 +285,9 @@ struct PrototypingView: View {
         .padding()
         .onAppear {
             setupEatingDetection()
+            
+            // Check audio permission status
+            checkAudioPermission()
         }
 
         // MARK: - Modals
@@ -222,6 +332,10 @@ struct PrototypingView: View {
                             
                             // End the activity
                             audioManager.endEatingActivity()
+                            
+                            debugText = "Food logged: \(selectedFood ?? "unknown") at \(formattedTime())"
+                        } else {
+                            debugText = "Manual food logged: \(selectedFood ?? "unknown") at \(formattedTime())"
                         }
                         
                         // Reset manual mode flag
@@ -256,6 +370,10 @@ struct PrototypingView: View {
                                 
                                 // End the activity
                                 audioManager.endEatingActivity()
+                                
+                                debugText = "Food detection canceled at \(formattedTime())"
+                            } else {
+                                debugText = "Manual food log canceled at \(formattedTime())"
                             }
                             
                             // Reset manual mode flag
@@ -290,6 +408,8 @@ struct PrototypingView: View {
                             isShowingFoodTypeSheet = false
                             isShowingLogFoodSheet = true
                             
+                            debugText = "Food prediction rejected at \(formattedTime())"
+                            
                             // No need to track here, will track when food is logged
                         } label: {
                             Text("No")
@@ -308,6 +428,8 @@ struct PrototypingView: View {
                                 predictedFoodCorrect: true,
                                 selectedFood: audioManager.predictedFoodType
                             )
+                            
+                            debugText = "Food prediction confirmed: \(audioManager.predictedFoodType ?? "unknown") at \(formattedTime())"
                             
                             // End the activity
                             audioManager.endEatingActivity()
@@ -334,6 +456,8 @@ struct PrototypingView: View {
                                 selectedFood: nil
                             )
                             
+                            debugText = "Food type prediction canceled at \(formattedTime())"
+                            
                             // End the activity
                             audioManager.endEatingActivity()
                         }
@@ -352,6 +476,8 @@ struct PrototypingView: View {
                     // New eating session detected
                     self.metricsManager.trackNotificationSent()
                     
+                    debugText = "Eating detected at \(formattedTime()) with confidence: \(String(format: "%.1f%%", self.audioManager.eatingConfidence * 100))"
+                    
                     if self.audioManager.predictedFoodType != nil {
                         // If we have a predicted food type, show that sheet
                         self.isShowingFoodTypeSheet = true
@@ -362,6 +488,25 @@ struct PrototypingView: View {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    private func checkAudioPermission() {
+        switch AVAudioSession.sharedInstance().recordPermission {
+        case .granted:
+            debugText = "Microphone permission granted"
+        case .denied:
+            debugText = "ERROR: Microphone permission denied"
+        case .undetermined:
+            debugText = "Microphone permission not determined yet"
+        @unknown default:
+            debugText = "Unknown microphone permission status"
+        }
+    }
+    
+    private func formattedTime() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: Date())
     }
     
     private func shareAnalytics() {
@@ -396,18 +541,18 @@ struct PreferencesView: View {
         case foodType = "Food Type"
         var id: String { self.rawValue }
     }
-
+    
     enum DetectionModel: String, CaseIterable, Identifiable {
         case native = "Native"
         case outside = "Outside"
         var id: String { self.rawValue }
     }
-
+    
     @EnvironmentObject var metricsManager: MetricsManager
     @State private var selectedDesign: LiveActivityDesign = .simple
     @State private var selectedModel: DetectionModel = .native
     @AppStorage("eatingSessionCooldown") private var eatingSessionCooldown: Double = 900 // Default 15 min
-
+    
     var body: some View {
         List {
             Section(
@@ -429,7 +574,7 @@ struct PreferencesView: View {
                     }
                 }
             }
-
+            
             Section(header: Text("EATING DETECTION MODEL")) {
                 ForEach(DetectionModel.allCases) { model in
                     HStack {
@@ -446,9 +591,31 @@ struct PreferencesView: View {
                     }
                 }
             }
+            
+            Section(header: Text("DETECTION SETTINGS")) {
+                Stepper(value: $eatingSessionCooldown, in: 30...3600, step: 30) {
+                    HStack {
+                        Text("Cooldown period")
+                        Spacer()
+                        Text(formatSeconds(eatingSessionCooldown))
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
         .navigationBarTitleDisplayMode(.large)
         .background(Color(.systemGray6).ignoresSafeArea())
+    }
+    
+    private func formatSeconds(_ seconds: Double) -> String {
+        let minutes = Int(seconds) / 60
+        let remainingSeconds = Int(seconds) % 60
+        
+        if remainingSeconds == 0 {
+            return "\(minutes) min"
+        } else {
+            return "\(minutes) min \(remainingSeconds) sec"
+        }
     }
 }
