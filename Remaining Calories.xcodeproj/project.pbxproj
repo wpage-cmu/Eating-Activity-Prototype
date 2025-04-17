@@ -88,13 +88,6 @@
 			);
 			target = 7C8C16DE2D8088A3006BFA0D /* Live ActivityExtension */;
 		};
-		EF7911E72DADF01F00A7906B /* Exceptions for "Eating Activity PrototypeUITests" folder in "Eating Activity PrototypeUITests" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Eating-Activity-PrototypeUITests-Info.plist",
-			);
-			target = 7C8C16C72D8084DC006BFA0D /* Eating Activity PrototypeUITests */;
-		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -115,9 +108,6 @@
 		};
 		7C8C16CB2D8084DC006BFA0D /* Eating Activity PrototypeUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				EF7911E72DADF01F00A7906B /* Exceptions for "Eating Activity PrototypeUITests" folder in "Eating Activity PrototypeUITests" target */,
-			);
 			path = "Eating Activity PrototypeUITests";
 			sourceTree = "<group>";
 		};
@@ -548,7 +538,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Eating Activity Prototype/Preview Content\"";
-				DEVELOPMENT_TEAM = 347834QV62;
+				DEVELOPMENT_TEAM = KC6KJ558HZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eating-Activity-Prototype-Info.plist";
@@ -583,7 +573,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"Eating Activity Prototype/Preview Content\"";
-				DEVELOPMENT_TEAM = 347834QV62;
+				DEVELOPMENT_TEAM = KC6KJ558HZ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = "Eating-Activity-Prototype-Info.plist";

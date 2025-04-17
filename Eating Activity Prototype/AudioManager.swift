@@ -40,8 +40,13 @@ class AudioManager: NSObject, ObservableObject {
     private var lastEatingDetection: Date? = nil
     
     // Eating detection configuration - REDUCED THRESHOLD FOR TESTING
-    private let eatingThreshold: Float = 0.2 // LOWERED FROM 0.6
-    private let eatingKeywords = ["chewing", "bite", "eating", "crunching", "munching", "food"]
+    private let eatingThreshold: Float = 0.4 // LOWERED FROM 0.6
+    private let eatingKeywords = [
+        "chewing", "biting", "crunching", "munching", "slurp", "burp",
+        "gargling", "cutlery_silverware", "chopping_food", "microwave_oven",
+        "frying_food", "crushing", "gurgling", "liquid_sloshing",
+        "liquid_pouring", "liquid_filling_container"
+    ]
     
     // In AudioManager.swift - add to init()
     override init() {

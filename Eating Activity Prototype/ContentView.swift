@@ -195,7 +195,7 @@ struct PrototypingView: View {
                         }
                         .frame(height: 30)
                         .padding()
-                        .background(Color.white)
+                        .background(Color(.systemBackground))
                         .cornerRadius(12)
 
                     Text("This app does not store audio recordings used for eating detection.")
@@ -393,7 +393,7 @@ struct PrototypingView: View {
             NavigationStack {
                 VStack {
                     VStack(spacing: 16) {
-                        Text("Sounds like you're eating...")
+                        Text("Sound Class Type:")
                             .font(.title3)
                             .fontWeight(.bold)
                             .foregroundStyle(.secondary)
@@ -620,4 +620,8 @@ struct PreferencesView: View {
             return "\(minutes) min \(remainingSeconds) sec"
         }
     }
+}
+
+#Preview {
+    ContentView()
 }
