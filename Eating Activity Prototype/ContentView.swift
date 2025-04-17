@@ -3,6 +3,48 @@ import ActivityKit
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var audioClassifierManager = AudioClassifierManager()
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("Detected Sound:")
+                .font(.headline)
+            Text(audioClassifierManager.detectedSound)
+                .font(.largeTitle)
+                .foregroundColor(.blue)
+            Text(String(format: "Confidence: %.2f%%", audioClassifierManager.confidence))
+                .font(.subheadline)
+            HStack(spacing: 20) {
+                Button(action: {
+                    audioClassifierManager.startClassification()
+                }) {
+                    Text("Start Classification")
+                        .padding()
+                        .background(Color.green)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                Button(action: {
+                    audioClassifierManager.stopClassification()
+                }) {
+                    Text("Stop Classification")
+                        .padding()
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+            }
+        }
+        .padding()
+        .navigationTitle("Sound Classifier")
+    }
+}
+
+//#Preview {
+//    ContentView()
+//}
+
+/*
+struct ContentView: View {
     @State       private var activity: Activity<TimerAttributes>? = nil
     @StateObject private var audioClassifierManager = AudioClassifierManager()
     
@@ -40,7 +82,4 @@ struct ContentView: View {
         }
     }
 }
-
-//#Preview {
-//    ContentView()
-//}
+ */

@@ -131,9 +131,11 @@ class AudioManager: NSObject, ObservableObject {
                                               atAudioFramePosition: AVAudioFramePosition(time.audioTimeStamp.mSampleTime))
                 
             // Add a Predictions for the Food Prediction model
+                /*
             self.foodPredictionModel?.prediction(audioFiles = buffer,
                                                  overlapFactor = request.overlapFactor,
                                                  predictionTimeWindowSize = request.windowDuration)
+            */
             }
         }
     }

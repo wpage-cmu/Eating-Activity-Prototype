@@ -14,19 +14,18 @@ import Combine
 //Class for: (1) Importing FoodPredictionModel & (2)Access Mic Audio
 class FoodPredictionAudioClassifier {
     private let audioEngine = AVAudioEngine()
-    //private var soundClassifier: FoodPredictionModel_3_d_// Replace with your trained Core ML model
-    private var soundClassifier: MLModel?
+    private var soundClassifier: FoodPredictionModel_3_d_?// Replace with your trained Core ML model
+    //private var soundClassifier: MLModel?
     @Published var resultsObserver: ResultsObserver?
 
     init(model: MLModel) {
         let config = MLModelConfiguration()
         do  {
-            self.soundClassifier = try FoodPredictionModel_3_d_().model
+            self.soundClassifier = try FoodPredictionModel_3_d_()
         } catch {
             //handle error
             print("Error in Loading Food Prediction Classifier: ", error)
         }
-        //self.soundClassifier = FoodPredictionModel_3_d_()
         self.resultsObserver = ResultsObserver()
     }
 
@@ -42,7 +41,7 @@ class FoodPredictionAudioClassifier {
         }
 
         do {
-            let request = try SNClassifySoundRequest(mlModel: soundClassifier)
+            let request = try SNClassifySoundRequest(mlModel: soundClassifier.model)
             request.windowDuration = CMTimeMakeWithSeconds(windowDuration, preferredTimescale: Int32(format.sampleRate))
             request.overlapFactor  = overlapFactor
 
@@ -82,7 +81,7 @@ class ResultsObserver: NSObject, SNResultsObserving {
         let identifier = topClassification.identifier
         let confidence = topClassification.confidence
         onResult?(identifier, confidence)
-        //print("Detected sound: \(identifier) with confidence \(confidence)%")
+        print("Detected sound: \(identifier) with confidence \(confidence)%")
     }
 
     func request(_ request: SNRequest, didFailWithError error: Error) {
