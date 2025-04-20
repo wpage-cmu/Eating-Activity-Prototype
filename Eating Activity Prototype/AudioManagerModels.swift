@@ -19,7 +19,6 @@ class FoodPredictionAudioClassifier {
     @Published var resultsObserver: ResultsObserver?
 
     init(model: MLModel) {
-        let config = MLModelConfiguration()
         do  {
             self.soundClassifier = try FoodPredictionModel_3_d_()
         } catch {
