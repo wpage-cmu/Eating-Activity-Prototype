@@ -2,42 +2,53 @@
 import ActivityKit
 import SwiftUI
 
+enum ClassificationState {
+    case idle
+    case running
+}
+
 struct ContentView: View {
     @StateObject private var audioClassifierManager = AudioClassifierManager()
     @StateObject private var foodLogVM = FoodLogViewModel()
+    @State private var classificationState: ClassificationState = .idle
     @State private var predictedFood: String = ""
     @State private var showAddFood = false
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 20) {
+            VStack(spacing: 10) {
+                Text("AI-Powered Calorie Logging")
+                    .font(.caption)
+                Text("Food Prediction App")
+                    .font(.title)
                 Text("Detected Sound:")
-                    .font(.headline)
+                    .font(.caption)
                 Text(audioClassifierManager.detectedSound)
                     .font(.largeTitle)
                     .foregroundColor(.blue)
                 Text(String(format: "Confidence: %.2f%%", audioClassifierManager.confidence))
                     .font(.subheadline)
                 HStack(spacing: 20) {
-                    Button(action: {
-                        audioClassifierManager.startClassification()
-                    }) {
-                        Text("Start Classification")
-                            .padding()
-                            .background(Color.green)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
+                    if classificationState == .idle {
+                            Button("Start Classification") {
+                                classificationState = .running
+                                // Start classification logic
+                                audioClassifierManager.startClassification()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.green)
+                        } else if classificationState == .running {
+                            Button("Stop Classification") {
+                                classificationState = .idle
+                                // Stop classification logic
+                                audioClassifierManager.stopClassification()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(.red)
+                        }
                     }
-                    Button(action: {
-                        audioClassifierManager.stopClassification()
-                    }) {
-                        Text("Stop Classification")
-                            .padding()
-                            .background(Color.red)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                }
+                    .animation(.default, value: classificationState)
+                    .padding()
                 Button("Log Food") {
                     // Trigger ML prediction and show form
                     predictedFood = audioClassifierManager.detectedSound
@@ -48,7 +59,7 @@ struct ContentView: View {
                 }
                 
                 NavigationLink("History", destination: EatingHistory())
-                NavigationLink("Performance", destination: AnalyticsView())
+                NavigationLink("Performance Metrics", destination: AnalyticsView())
             }
         }
         .padding()
@@ -167,20 +178,22 @@ struct AnalyticsView: View {
         
         ScrollView {
             Text("Confusion Matrix").font(.headline)
-            VStack(alignment: .leading) {
-                HStack {
-                    Text("Actual \\ Predicted").frame(width: 120)
-                    ForEach(labels, id: \.self) { label in
-                        Text(label).bold().frame(minWidth: 80)
-                    }
-                }
-                ForEach(0..<labels.count, id: \.self) { i in
+            ScrollView(.horizontal) {
+                VStack(alignment: .leading) {
                     HStack {
-                        Text(labels[i]).bold().frame(width: 120)
-                        ForEach(0..<labels.count, id: \.self) { j in
-                            Text("\(matrix[i][j])")
-                                .frame(minWidth: 80)
-                                .background(i == j ? Color.green.opacity(0.2) : Color.red.opacity(0.1))
+                        Text("Actual \\ Predicted").frame(width: 120)
+                        ForEach(labels, id: \.self) { label in
+                            Text(label).bold().frame(minWidth: 80)
+                        }
+                    }
+                    ForEach(0..<labels.count, id: \.self) { i in
+                        HStack {
+                            Text(labels[i]).bold().frame(width: 120)
+                            ForEach(0..<labels.count, id: \.self) { j in
+                                Text("\(matrix[i][j])")
+                                    .frame(minWidth: 80)
+                                    .background(i == j ? Color.green.opacity(0.2) : Color.red.opacity(0.1))
+                            }
                         }
                     }
                 }
@@ -193,22 +206,24 @@ struct AnalyticsView: View {
                 .font(.title3)
             Divider()
             Text("Per-Class Metrics").font(.headline)
-            VStack(alignment: .leading) {
-                HStack {
-                    Text("Class").bold().frame(width: 80)
-                    Text("Precision").bold().frame(width: 80)
-                    Text("Recall").bold().frame(width: 80)
-                    Text("F1-Score").bold().frame(width: 80)
-                    Text("Support").bold().frame(width: 80)
-                }
-                ForEach(labels, id: \.self) { label in
-                    let m = metrics[label] ?? FoodPredictionAnalytics.Metrics(precision: 0, recall: 0, f1: 0, support: 0)
+            ScrollView(.horizontal) {
+                VStack(alignment: .leading) {
                     HStack {
-                        Text(label).frame(width: 80)
-                        Text(String(format: "%.2f", m.precision)).frame(width: 80)
-                        Text(String(format: "%.2f", m.recall)).frame(width: 80)
-                        Text(String(format: "%.2f", m.f1)).frame(width: 80)
-                        Text("\(m.support)").frame(width: 80)
+                        Text("Class").bold().frame(width: 80)
+                        Text("Precision").bold().frame(width: 80)
+                        Text("Recall").bold().frame(width: 80)
+                        Text("F1-Score").bold().frame(width: 80)
+                        Text("Support").bold().frame(width: 80)
+                    }
+                    ForEach(labels, id: \.self) { label in
+                        let m = metrics[label] ?? FoodPredictionAnalytics.Metrics(precision: 0, recall: 0, f1: 0, support: 0)
+                        HStack {
+                            Text(label).frame(width: 80)
+                            Text(String(format: "%.2f", m.precision)).frame(width: 80)
+                            Text(String(format: "%.2f", m.recall)).frame(width: 80)
+                            Text(String(format: "%.2f", m.f1)).frame(width: 80)
+                            Text("\(m.support)").frame(width: 80)
+                        }
                     }
                 }
             }

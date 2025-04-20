@@ -13,11 +13,17 @@ class FoodPredictionAnalytics {
     let labelIndex: [String: Int]
     let confusionMatrix: [[Int]]
     
+    //Labels from training data
+    private var filteredLabels: [String] = ["pizza", "jelly", "wings", "chocolate", "grapes", "salmon", "burger", "gummies", "aloe", "fries", "chips", "noodles", "cabbage", "drinks", "carrots", "ice-cream", "soup", "pickles", "ribs", "candied_fruits"]
+    
     init(entries: [FoodEntry]) {
         self.entries = entries
-        // Collect all unique labels (predicted and actual), sorted for consistency
-        let allLabels = Set(entries.flatMap { [$0.predictedFood, $0.actualFood] })
-        self.labels = Array(allLabels).sorted()
+        /* Collect all unique labels (predicted and actual), sorted for consistency
+         let allLabels = Set(entries.flatMap { [$0.predictedFood, $0.actualFood] })
+         self.labels = Array(allLabels).sorted()
+        */
+        //Only use labels present in filteredLabels
+        self.labels = filteredLabels
         self.labelIndex = Dictionary(uniqueKeysWithValues: labels.enumerated().map { ($1, $0) })
         self.confusionMatrix = FoodPredictionAnalytics.buildConfusionMatrix(entries: entries, labels: labels, labelIndex: labelIndex)
     }
@@ -25,6 +31,9 @@ class FoodPredictionAnalytics {
     //Building Confusion Matrix
     static func buildConfusionMatrix(entries: [FoodEntry], labels: [String], labelIndex: [String: Int]) -> [[Int]] {
         var matrix = Array(repeating: Array(repeating: 0, count: labels.count), count: labels.count)
+        //Only Compute for Labels within filteredLabelSet
+        let labelSet = Set(labels)
+        _ = entries.filter { labelSet.contains($0.actualFood) && labelSet.contains($0.predictedFood) }
         for entry in entries {
             if let actualIdx = labelIndex[entry.actualFood], let predIdx = labelIndex[entry.predictedFood] {
                 matrix[actualIdx][predIdx] += 1
