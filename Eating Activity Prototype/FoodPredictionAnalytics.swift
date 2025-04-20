@@ -15,17 +15,26 @@ class FoodPredictionAnalytics {
     
     //Labels from training data
     private var filteredLabels: [String] = ["pizza", "jelly", "wings", "chocolate", "grapes", "salmon", "burger", "gummies", "aloe", "fries", "chips", "noodles", "cabbage", "drinks", "carrots", "ice-cream", "soup", "pickles", "ribs", "candied_fruits"]
+    private var constrained: Bool = false;
     
-    init(entries: [FoodEntry]) {
-        self.entries = entries
-        /* Collect all unique labels (predicted and actual), sorted for consistency
-         let allLabels = Set(entries.flatMap { [$0.predictedFood, $0.actualFood] })
-         self.labels = Array(allLabels).sorted()
-        */
-        //Only use labels present in filteredLabels
-        self.labels = filteredLabels
+    init(entries: [FoodEntry], constraintType: Bool = false) {
+        self.entries     = entries
+        self.constrained = constraintType
+        if constraintType {
+            //Only use labels present in filteredLabels
+            self.labels = filteredLabels
+        } else {
+            //Collect all unique labels (predicted and actual), sorted for consistency
+            let allLabels = Set(entries.flatMap { [$0.predictedFood, $0.actualFood] })
+            self.labels = Array(allLabels).sorted()
+        }
         self.labelIndex = Dictionary(uniqueKeysWithValues: labels.enumerated().map { ($1, $0) })
-        self.confusionMatrix = FoodPredictionAnalytics.buildConfusionMatrix(entries: entries, labels: labels, labelIndex: labelIndex)
+        if constraintType {
+            self.confusionMatrix = FoodPredictionAnalytics.buildConfusionMatrix(entries: entries, labels: labels, labelIndex: labelIndex)
+        } else {
+            self.confusionMatrix = FoodPredictionAnalytics.buildUnconstrainedConfusionMatrix(entries: entries, labels: labels, labelIndex: labelIndex)
+        }
+        
     }
     
     //Building Confusion Matrix
@@ -34,6 +43,16 @@ class FoodPredictionAnalytics {
         //Only Compute for Labels within filteredLabelSet
         let labelSet = Set(labels)
         _ = entries.filter { labelSet.contains($0.actualFood) && labelSet.contains($0.predictedFood) }
+        for entry in entries {
+            if let actualIdx = labelIndex[entry.actualFood], let predIdx = labelIndex[entry.predictedFood] {
+                matrix[actualIdx][predIdx] += 1
+            }
+        }
+        return matrix
+    }
+    
+    static func buildUnconstrainedConfusionMatrix(entries: [FoodEntry], labels: [String], labelIndex: [String: Int]) -> [[Int]] {
+        var matrix = Array(repeating: Array(repeating: 0, count: labels.count), count: labels.count)
         for entry in entries {
             if let actualIdx = labelIndex[entry.actualFood], let predIdx = labelIndex[entry.predictedFood] {
                 matrix[actualIdx][predIdx] += 1

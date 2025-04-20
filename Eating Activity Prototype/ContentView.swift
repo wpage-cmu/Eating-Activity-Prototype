@@ -59,7 +59,8 @@ struct ContentView: View {
                 }
                 
                 NavigationLink("History", destination: EatingHistory())
-                NavigationLink("Performance Metrics", destination: AnalyticsView())
+                NavigationLink("(Constrained) Performance Metrics", destination: constrainedAnalyticsView())
+                NavigationLink("(Unconstrained) Performance Metrics", destination: unConstrainedAnalyticsView())
             }
         }
         .padding()
@@ -165,11 +166,78 @@ struct EatingHistory: View {
     }
 }
 
-struct AnalyticsView: View {
+struct constrainedAnalyticsView: View {
     @EnvironmentObject var foodLogVM: FoodLogViewModel
 
     var body: some View {
-        let analytics = FoodPredictionAnalytics(entries: foodLogVM.entries)
+        let analytics = FoodPredictionAnalytics(entries: foodLogVM.entries, constraintType: true)
+        let labels   = analytics.labels
+        let matrix   = analytics.confusionMatrix
+        let metrics  = analytics.perClassMetrics()
+        let accuracy = analytics.overallAccuracy()
+        let macroF1  = analytics.macroAveragedF1()
+        
+        ScrollView {
+            Text("Confusion Matrix").font(.headline)
+            ScrollView(.horizontal) {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Actual \\ Predicted").frame(width: 120)
+                        ForEach(labels, id: \.self) { label in
+                            Text(label).bold().frame(minWidth: 80)
+                        }
+                    }
+                    ForEach(0..<labels.count, id: \.self) { i in
+                        HStack {
+                            Text(labels[i]).bold().frame(width: 120)
+                            ForEach(0..<labels.count, id: \.self) { j in
+                                Text("\(matrix[i][j])")
+                                    .frame(minWidth: 80)
+                                    .background(i == j ? Color.green.opacity(0.2) : Color.red.opacity(0.1))
+                            }
+                        }
+                    }
+                }
+            }
+            Divider()
+            Text("Overall Accuracy: \(String(format: "%.2f", accuracy * 100))%")
+                .font(.title3)
+                .padding(.vertical)
+            Text("Macro F1 Score: \(String(format: "%.2f", macroF1))")
+                .font(.title3)
+            Divider()
+            Text("Per-Class Metrics").font(.headline)
+            ScrollView(.horizontal) {
+                VStack(alignment: .leading) {
+                    HStack {
+                        Text("Class").bold().frame(width: 80)
+                        Text("Precision").bold().frame(width: 80)
+                        Text("Recall").bold().frame(width: 80)
+                        Text("F1-Score").bold().frame(width: 80)
+                        Text("Support").bold().frame(width: 80)
+                    }
+                    ForEach(labels, id: \.self) { label in
+                        let m = metrics[label] ?? FoodPredictionAnalytics.Metrics(precision: 0, recall: 0, f1: 0, support: 0)
+                        HStack {
+                            Text(label).frame(width: 80)
+                            Text(String(format: "%.2f", m.precision)).frame(width: 80)
+                            Text(String(format: "%.2f", m.recall)).frame(width: 80)
+                            Text(String(format: "%.2f", m.f1)).frame(width: 80)
+                            Text("\(m.support)").frame(width: 80)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+    }
+}
+
+struct unConstrainedAnalyticsView: View {
+    @EnvironmentObject var foodLogVM: FoodLogViewModel
+
+    var body: some View {
+        let analytics = FoodPredictionAnalytics(entries: foodLogVM.entries, constraintType: false)
         let labels   = analytics.labels
         let matrix   = analytics.confusionMatrix
         let metrics  = analytics.perClassMetrics()
