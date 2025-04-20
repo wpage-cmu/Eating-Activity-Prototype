@@ -33,3 +33,4 @@ class FoodLogViewModel: ObservableObject {
         entries.append(entry)
     }
 }
+
