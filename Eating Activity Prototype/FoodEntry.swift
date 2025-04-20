@@ -21,14 +21,14 @@ struct FoodEntry: Identifiable {
 class FoodLogViewModel: ObservableObject {
     @Published var entries: [FoodEntry] = []
     
-    func saveFoodEntry(predictedFood: String, foodName: String, calories: Int, wasPredictionCorrect: Bool) {
+    func saveFoodEntry(predictedFood: String, foodName: String, calories: Int, wasPredictionCorrect: Bool, date: Date) {
         let entry = FoodEntry(
             foodName: foodName,
             calories: calories,
             wasPredictionCorrect: wasPredictionCorrect,
             predictedFood: predictedFood,
             actualFood: foodName,
-            date: Date()
+            date: date
         )
         entries.append(entry)
     }

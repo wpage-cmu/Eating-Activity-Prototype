@@ -9,45 +9,46 @@ struct ContentView: View {
     @State private var showAddFood = false
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Detected Sound:")
-                .font(.headline)
-            Text(audioClassifierManager.detectedSound)
-                .font(.largeTitle)
-                .foregroundColor(.blue)
-            Text(String(format: "Confidence: %.2f%%", audioClassifierManager.confidence))
-                .font(.subheadline)
-            HStack(spacing: 20) {
-                Button(action: {
-                    audioClassifierManager.startClassification()
-                }) {
-                    Text("Start Classification")
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
+        NavigationStack {
+            VStack(spacing: 20) {
+                Text("Detected Sound:")
+                    .font(.headline)
+                Text(audioClassifierManager.detectedSound)
+                    .font(.largeTitle)
+                    .foregroundColor(.blue)
+                Text(String(format: "Confidence: %.2f%%", audioClassifierManager.confidence))
+                    .font(.subheadline)
+                HStack(spacing: 20) {
+                    Button(action: {
+                        audioClassifierManager.startClassification()
+                    }) {
+                        Text("Start Classification")
+                            .padding()
+                            .background(Color.green)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    Button(action: {
+                        audioClassifierManager.stopClassification()
+                    }) {
+                        Text("Stop Classification")
+                            .padding()
+                            .background(Color.red)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
                 }
-                Button(action: {
-                    audioClassifierManager.stopClassification()
-                }) {
-                    Text("Stop Classification")
-                        .padding()
-                        .background(Color.red)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-            }
-            Button("Log Food") {
-                // Trigger ML prediction and show form
-                predictedFood = audioClassifierManager.detectedSound
-                showAddFood = true
+                Button("Log Food") {
+                    // Trigger ML prediction and show form
+                    predictedFood = audioClassifierManager.detectedSound
+                    showAddFood = true
                 }
                 .sheet(isPresented: $showAddFood) {
                     AddFoodForm(predictedFood: $predictedFood)
                 }
                 
-
-           NavigationLink("Analytics", destination: AnalyticsView())
+                NavigationLink("History", destination: EatingHistory())
+            }
         }
         .padding()
         .navigationTitle("Sound Classifier")
@@ -60,6 +61,7 @@ struct AddFoodForm: View {
     @State private var calories: Double = 0
     @State private var isPredictionConfirmed: Bool? = nil
     @State private var correctedFood: String = ""
+    @State private var selectedDate = Date()
     @EnvironmentObject var foodLogVM: FoodLogViewModel
     @Environment(\.presentationMode) var presentationMode
     
@@ -109,13 +111,22 @@ struct AddFoodForm: View {
                         Text("\(Int(calories)) kcal")
                     }
                 }
+               
+                Section(header: Text("Date & Time")) {
+                    DatePicker(
+                        "When did you eat?",
+                        selection: $selectedDate,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                }
                 
                 Button("Submit") {
                     foodLogVM.saveFoodEntry(
                         predictedFood: predictedFood,
                         foodName: foodName,
                         calories: Int(calories),
-                        wasPredictionCorrect: isPredictionConfirmed == true
+                        wasPredictionCorrect: isPredictionConfirmed == true,
+                        date: selectedDate
                     )
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -125,19 +136,18 @@ struct AddFoodForm: View {
     }
 }
 
-struct AnalyticsView: View {
+struct EatingHistory: View {
     // Assume you have arrays: actualLabels, predictedLabels
     @EnvironmentObject var foodLogVM: FoodLogViewModel
     
     var body: some View {
-        VStack {
-            List(foodLogVM.entries) { entry in
-                VStack(alignment: .leading) {
-                    Text("Predicted: \(entry.predictedFood)")
-                    Text("Actual: \(entry.actualFood)")
-                    Text("Calories: \(entry.calories)")
-                    Text("Correct: \(entry.wasPredictionCorrect ? "Yes" : "No")")
-                }
+        List(foodLogVM.entries) { entry in
+            VStack(alignment: .leading) {
+                Text("Predicted: \(entry.predictedFood)")
+                Text("Actual: \(entry.actualFood)")
+                Text("Calories: \(entry.calories)")
+                Text("Correct: \(entry.wasPredictionCorrect ? "Yes" : "No")")
+                Text("Date & Time: \(entry.date)")
             }
         }
     }
