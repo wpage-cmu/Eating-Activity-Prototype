@@ -17,3 +17,6 @@ The steps to reproduce are below.
 4. Open the `ContentView` file underneath the `Eating Activity Prototype` subdirectory.
 5. Select the deployment device connected to the developer laptop from the center status bar, located at the top of the Xcode.
 6. Build the project to deploy the application! You're done!  
+
+<img width="354" alt="Screenshot 2025-05-01 at 5 19 42 PM" src="https://github.com/user-attachments/assets/fd6f1ebc-e7f5-480f-81ae-7bf7570b8449" />
+
